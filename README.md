@@ -19,6 +19,8 @@ key, unlocks `door_3`, and steps through an exit:
 
 > Direct link: [`assets/demo.mp4`](assets/demo.mp4) (735 KB).
 
+![Ember dashboard](assets/demo.gif)
+
 | Requirements| Where it lives |
 | --- | --- |
 | A virtual environment the agent can exist in | [`ember/env.py`](ember/env.py), [`ember/floor_plan.py`](ember/floor_plan.py), [`ember/fire_sim.py`](ember/fire_sim.py) |
@@ -235,7 +237,7 @@ recover.
 
 ---
 
-## Run + record
+## Run
 
 Two ways to run the Gemini agent: **in-process** (fastest, for capturing
 JSONL traces) or **HTTP-driven** (same harness, but the env is behind
@@ -261,7 +263,7 @@ observation handed to the LLM, the LLM's reasoning + JSON reply, the
 parsed action, the world feedback, and the reward. Open it and read
 the whole episode without re-running anything.
 
-### B. With the live dashboard — for video recording
+### B. With the live dashboard 
 
 The server exposes a single-page HTML dashboard at `/` that polls
 `/scene` every 250 ms and renders the grid, fire, smoke, doors, keys,
@@ -300,7 +302,7 @@ dashboard, fast enough for a single take.
 
 ```bash
 pip install -e ".[gemini,server]"
-export GEMINI_API_KEY=...                          # never paste into chat
+export GEMINI_API_KEY=...                         
 python examples/run_llm_agent.py \
     --use-http http://localhost:8000 \
     --task escape_basic --seed 11 \
@@ -316,22 +318,6 @@ Note Gemini free-tier rate limits: `gemini-2.5-flash` is 5 RPM, so set
 HTTP one — same loop, but every reset/step is a POST against the
 running server, which means the dashboard's `/scene` poll sees each
 state change as it happens.
-
-### Capturing a screen recording
-
-- **macOS:** `cmd-shift-5` → "Record Selected Portion" → drag a box
-  around the browser window → click Record. Stop when the episode
-  ends (the `LIVE` pill in the header disappears).
-- **Anywhere:** OBS Studio, Loom, or your OS's built-in recorder
-  pointed at the browser window. Aim for a 30–60 second clip showing
-  one full episode.
-
-A good clip: start with the dashboard open and idle, then start the
-agent in terminal 2 so the viewer sees the goal line appear, the
-agent move, the fire spread, and the success state at the end. Mirror
-the terminal in a corner if you want the per-turn console logs visible
-too.
-
 
 ---
 
