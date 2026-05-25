@@ -1,3 +1,20 @@
+Metadata-Version: 2.4
+Name: ember-world
+Version: 0.1.0
+Summary: Ember — a 2D virtual world harness for LLM agents
+Requires-Python: <3.14,>=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: openenv-core[core]>=0.2.2
+Requires-Dist: pydantic>=2.0.0
+Provides-Extra: gemini
+Requires-Dist: google-genai>=1.0.0; extra == "gemini"
+Requires-Dist: requests>=2.31.0; extra == "gemini"
+Provides-Extra: server
+Requires-Dist: fastapi>=0.110.0; extra == "server"
+Requires-Dist: uvicorn[standard]>=0.24.0; extra == "server"
+Requires-Dist: sse-starlette>=2.0.0; extra == "server"
+Requires-Dist: requests>=2.31.0; extra == "server"
+
 # Ember — an LLM agent in a virtual world
 
 Ember places an LLM agent inside a 2D burning building. The agent reads
@@ -6,18 +23,7 @@ small discrete grammar, and works toward a named, verifiable goal —
 *escape*, *find the key and open the locked door*, or *rescue the
 trapped NPC and escape together*. The fire simulates around it.
 
-### Demo
 
-A live `key_and_door` episode driven through the dashboard at
-[`http://localhost:8000`](http://localhost:8000) — the agent picks up a
-key, unlocks `door_3`, and steps through an exit:
-
-<video src="assets/demo.mp4" controls width="720" muted playsinline>
-  Your browser does not render embedded video. Download or open
-  <a href="assets/demo.mp4">assets/demo.mp4</a> directly.
-</video>
-
-> Direct link: [`assets/demo.mp4`](assets/demo.mp4) (735 KB).
 
 | Requirements| Where it lives |
 | --- | --- |
@@ -190,51 +196,6 @@ JSON action — that's the "agent's mind" trace the prompt asks for.
 
 ---
 
-## Actual Gemma 4 run — what happened
-
-Trace: [`examples/traces/gemma_escape_basic_seed11.jsonl`](examples/traces/gemma_escape_basic_seed11.jsonl)
-
-Command:
-
-```bash
-python examples/run_llm_agent.py \
-    --task escape_basic --seed 11 \
-    --model gemma-4-31b-it --thinking OFF \
-    --max-steps 15 --step-delay 5 \
-    --log examples/traces/gemma_escape_basic_seed11.jsonl
-```
-
-Result: **15 turns, did not escape, HP stayed at 100.** Aggregate stats:
-
-| metric | value |
-| --- | --- |
-| turns | 15 |
-| final HP | 100 / 100 (no fire damage taken) |
-| task_complete | `False` (timed out, did not die) |
-| avg latency / turn | 11.1 s (Gemma is slower than `gemini-2.5-flash`) |
-| total prompt tokens | 26,248 |
-| total tokens (incl. output + thoughts) | 31,386 |
-
-What the trace shows: Gemma 4 read the goal correctly, identified
-`exit_0_7` as the closest exit, and moved west toward it for the first
-~4 turns. Then it lost the plan — turn 5 reply:
-
-> *"I have entered an unknown area and the exit `exit_0_7` is now to the
-> south, but moving south is not listed as an available action. I will
-> move north to re-orient myself or return to the previous area."*
-
-The model interpreted "`south` not in `available_actions_hint`" as
-"unsolvable" rather than "wall blocked, try another direction or use
-`look`," and oscillated N/S/E/W for the remaining turns. The full
-reasoning per turn is in the trace file linked above.
-
-To get a successful escape from a real model, try `--model
-gemini-2.5-flash --thinking HIGH` (better instruction-following), or
-`--max-steps 50 --seed 7` to give the same Gemma model more room to
-recover.
-
----
-
 ## Run + record
 
 Two ways to run the Gemini agent: **in-process** (fastest, for capturing
@@ -265,57 +226,36 @@ the whole episode without re-running anything.
 
 The server exposes a single-page HTML dashboard at `/` that polls
 `/scene` every 250 ms and renders the grid, fire, smoke, doors, keys,
-NPCs, and the agent in real time. Both the LLM harness and the BFS
-scripted agent support `--use-http`, so you can drive the same
-dashboard with either one.
-
-**The 60-second recipe (no API key required):**
+NPCs, and the agent in real time.
 
 ```bash
-pip install -e ".[server]"
+pip install -e ".[gemini,server]"
 
 # ─── terminal 1 ─── start the server
 uvicorn ember.server.app:app --port 8000
-# leave this running
 
 # ─── browser ─── open the dashboard
 open http://localhost:8000          # macOS
 # or visit http://localhost:8000 manually
-# start your screen recorder NOW
 
-# ─── terminal 2 ─── drive a clean deterministic demo
-python examples/run_scripted_agent.py \
-    --use-http http://localhost:8000 \
-    --task key_and_door --seed 11 \
-    --step-delay 0.6 --verbose \
-    --log examples/traces/key_and_door_seed11_http.jsonl
-```
-
-`key_and_door seed=11` is the cleanest demo seed: 12 turns, agent picks
-up the key, unlocks the door, escapes. At `--step-delay 0.6` that's
-about 8 seconds wall-clock — slow enough to read each action on the
-dashboard, fast enough for a single take.
-
-**With Gemini instead of the scripted agent:**
-
-```bash
-pip install -e ".[gemini,server]"
-export GEMINI_API_KEY=...                          # never paste into chat
+# ─── terminal 2 ─── drive the env over HTTP, slowly enough to see
+export GEMINI_API_KEY=...
 python examples/run_llm_agent.py \
     --use-http http://localhost:8000 \
-    --task escape_basic --seed 11 \
-    --model gemini-2.5-flash --thinking HIGH \
-    --step-delay 0.5 --max-steps 30 \
+    --task rescue \
+    --seed 11 \
+    --model gemini-2.5-flash \
+    --step-delay 0.5 \
     --log run.jsonl
 ```
-
-Note Gemini free-tier rate limits: `gemini-2.5-flash` is 5 RPM, so set
-`--step-delay 13` if you don't have a paid key.
 
 `--use-http <URL>` flips the harness from the in-process env to the
 HTTP one — same loop, but every reset/step is a POST against the
 running server, which means the dashboard's `/scene` poll sees each
 state change as it happens.
+
+`--step-delay 0.5` adds 500 ms between turns so the video has time to
+breathe between actions. Drop it to `0` for fastest possible runs.
 
 ### Capturing a screen recording
 
@@ -327,7 +267,7 @@ state change as it happens.
   one full episode.
 
 A good clip: start with the dashboard open and idle, then start the
-agent in terminal 2 so the viewer sees the goal line appear, the
+harness in terminal 2 so the viewer sees the goal line appear, the
 agent move, the fire spread, and the success state at the end. Mirror
 the terminal in a corner if you want the per-turn console logs visible
 too.
@@ -342,8 +282,6 @@ ember/
 ├── README.md                    you are here
 ├── DESIGN.md                    observation, action space, what worked / didn't
 ├── pyproject.toml
-├── assets/
-│   └── demo.mp4                 dashboard recording shown above
 ├── ember/
 │   ├── __init__.py
 │   ├── models.py                EmberAction / EmberObservation / EmberState
@@ -353,18 +291,15 @@ ember/
 │   ├── fire_sim.py              cellular-automaton fire + smoke
 │   ├── narrative.py             observation rendering
 │   ├── rubrics.py               reward components
-│   └── server/
-│       ├── app.py               FastAPI wrapper (reset / step / scene / state)
-│       └── dashboard.html       single-page UI polling /scene
+│   └── server/app.py            optional FastAPI wrapper
 └── examples/
-    ├── run_llm_agent.py         the Gemini LLM harness — the headline file
+    ├── run_llm_agent.py         the LLM harness — the headline file
     ├── run_random_agent.py      uniform-from-hints baseline
-    ├── run_scripted_agent.py    BFS reference (in-process or --use-http)
+    ├── run_scripted_agent.py    BFS reference (used to produce traces)
     └── traces/
-        ├── escape_basic_seed11.jsonl              scripted BFS reference
-        ├── key_and_door_seed11.jsonl              scripted BFS reference
-        ├── rescue_seed11.jsonl                    scripted BFS reference
-        └── gemma_escape_basic_seed11.jsonl        real Gemma 4 31B run
+        ├── escape_basic_seed11.jsonl
+        ├── key_and_door_seed11.jsonl
+        └── rescue_seed11.jsonl
 ```
 
 ---

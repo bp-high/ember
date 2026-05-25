@@ -1,0 +1,12 @@
+openenv-core[core]>=0.2.2
+pydantic>=2.0.0
+
+[gemini]
+google-genai>=1.0.0
+requests>=2.31.0
+
+[server]
+fastapi>=0.110.0
+uvicorn[standard]>=0.24.0
+sse-starlette>=2.0.0
+requests>=2.31.0

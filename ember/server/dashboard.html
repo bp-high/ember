@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Ember — live</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      background: #0d0e12;
+      color: #e8e8ea;
+    }
+    header {
+      padding: 12px 20px;
+      border-bottom: 1px solid #20232b;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    header h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: 0.4px; }
+    header .pill { font-size: 12px; padding: 3px 8px; border-radius: 9999px; background: #1a1d25; color: #9aa0aa; }
+    header .pill.live { background: #2a1e15; color: #ffa657; }
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 380px;
+      gap: 20px;
+      padding: 20px;
+      height: calc(100vh - 49px);
+    }
+    .grid-box {
+      background: #14161c;
+      border: 1px solid #20232b;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+    canvas { display: block; image-rendering: pixelated; }
+    aside {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow: hidden;
+    }
+    .panel {
+      background: #14161c;
+      border: 1px solid #20232b;
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #7d818c;
+    }
+    .goal { font-size: 13px; line-height: 1.45; }
+    .hp-bar {
+      height: 8px;
+      background: #20232b;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .hp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ffa657, #e85d4d);
+      transition: width 200ms ease;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 16px;
+      font-size: 12px;
+      color: #b6bac4;
+    }
+    .stats b { color: #e8e8ea; font-weight: 500; }
+    .feedback {
+      font-size: 12px;
+      color: #b6bac4;
+      max-height: 80px;
+      overflow-y: auto;
+      font-family: "SF Mono", "Menlo", monospace;
+      white-space: pre-wrap;
+    }
+    .legend {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 12px;
+      font-size: 11px;
+      color: #b6bac4;
+    }
+    .legend i {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      vertical-align: middle;
+      margin-right: 6px;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>EMBER</h1>
+    <span id="task-pill" class="pill">no episode</span>
+    <span id="live-pill" class="pill live" style="display:none">● LIVE</span>
+    <span class="pill" id="step-pill">step —</span>
+  </header>
+
+  <main>
+    <div class="grid-box">
+      <canvas id="grid" width="640" height="640"></canvas>
+    </div>
+
+    <aside>
+      <div class="panel">
+        <h2>Goal</h2>
+        <div class="goal" id="goal">—</div>
+      </div>
+
+      <div class="panel">
+        <h2>Agent</h2>
+        <div class="stats">
+          <div>HP <b id="hp">—</b></div>
+          <div>Pos <b id="pos">—</b></div>
+          <div>Inventory <b id="inv">—</b></div>
+          <div>Status <b id="status">—</b></div>
+        </div>
+        <div class="hp-bar"><div class="hp-fill" id="hp-fill" style="width:100%"></div></div>
+      </div>
+
+      <div class="panel">
+        <h2>Last feedback</h2>
+        <div class="feedback" id="feedback">—</div>
+      </div>
+
+      <div class="panel">
+        <h2>Legend</h2>
+        <div class="legend">
+          <div><i style="background:#3a3f4b"></i>wall</div>
+          <div><i style="background:#1c1f27"></i>floor</div>
+          <div><i style="background:#5b8def"></i>open door</div>
+          <div><i style="background:#274472"></i>closed door</div>
+          <div><i style="background:#3ddc97"></i>exit</div>
+          <div><i style="background:#e85d4d"></i>fire</div>
+          <div><i style="background:#6f6766"></i>smoke</div>
+          <div><i style="background:#ffd166"></i>key</div>
+          <div><i style="background:#c084fc"></i>NPC</div>
+          <div><i style="background:#fff"></i>agent</div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("grid");
+    const ctx = canvas.getContext("2d");
+
+    const COLORS = {
+      floor: "#1c1f27",
+      wall: "#3a3f4b",
+      doorOpen: "#5b8def",
+      doorClosed: "#274472",
+      exit: "#3ddc97",
+      obstacle: "#221d1c",
+      grid: "#0d0e12",
+    };
+
+    function cellColor(t) {
+      switch (t) {
+        case 0: return COLORS.floor;
+        case 1: return COLORS.wall;
+        case 2: return COLORS.doorOpen;
+        case 3: return COLORS.doorClosed;
+        case 4: return COLORS.exit;
+        case 5: return COLORS.obstacle;
+        default: return COLORS.floor;
+      }
+    }
+
+    function draw(scene) {
+      const { w, h, cells, fire, smoke, exits, keys, npcs, npcs_rescued, locked_doors, doors } = scene.grid;
+      const size = Math.floor(Math.min(canvas.width, canvas.height) / Math.max(w, h));
+      const offX = (canvas.width - size * w) / 2;
+      const offY = (canvas.height - size * h) / 2;
+
+      ctx.fillStyle = "#0d0e12";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const idx = (x, y) => y * w + x;
+
+      // 1. cells
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = idx(x, y);
+          ctx.fillStyle = cellColor(cells[i]);
+          ctx.fillRect(offX + x * size, offY + y * size, size, size);
+        }
+      }
+
+      // 2. smoke overlay
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const s = smoke[idx(x, y)];
+          if (s > 0.05) {
+            ctx.fillStyle = `rgba(110,103,102,${Math.min(0.7, s)})`;
+            ctx.fillRect(offX + x * size, offY + y * size, size, size);
+          }
+        }
+      }
+
+      // 3. fire overlay
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const f = fire[idx(x, y)];
+          if (f > 0.05) {
+            ctx.fillStyle = `rgba(232,93,77,${Math.min(0.9, 0.3 + f * 0.7)})`;
+            ctx.fillRect(offX + x * size, offY + y * size, size, size);
+          }
+        }
+      }
+
+      // 4. locked doors — outline
+      Object.entries(doors || {}).forEach(([id, [x, y]]) => {
+        if ((locked_doors || []).includes(id)) {
+          ctx.strokeStyle = "#ffd166";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(offX + x * size + 1, offY + y * size + 1, size - 2, size - 2);
+        }
+      });
+
+      // 5. keys
+      Object.entries(keys || {}).forEach(([_, [x, y]]) => {
+        ctx.fillStyle = "#ffd166";
+        const cx = offX + x * size + size / 2;
+        const cy = offY + y * size + size / 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, Math.max(2, size * 0.25), 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // 6. NPCs (not yet rescued)
+      Object.entries(npcs || {}).forEach(([id, [x, y]]) => {
+        if ((npcs_rescued || []).includes(id)) return;
+        ctx.fillStyle = "#c084fc";
+        ctx.fillRect(offX + x * size + size * 0.2,
+                     offY + y * size + size * 0.2,
+                     size * 0.6, size * 0.6);
+      });
+
+      // 7. exits — bright border
+      (exits || []).forEach(([x, y]) => {
+        ctx.strokeStyle = "#3ddc97";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(offX + x * size + 1, offY + y * size + 1, size - 2, size - 2);
+      });
+
+      // 8. agent — pulsing white square
+      const ax = scene.agent.x, ay = scene.agent.y;
+      const t = Date.now() / 400;
+      const pulse = 0.7 + 0.3 * Math.sin(t);
+      ctx.fillStyle = `rgba(255,255,255,${pulse})`;
+      ctx.fillRect(offX + ax * size + size * 0.15,
+                   offY + ay * size + size * 0.15,
+                   size * 0.7, size * 0.7);
+    }
+
+    function updatePanels(scene) {
+      const ep = scene.episode;
+      const ag = scene.agent;
+
+      document.getElementById("task-pill").textContent = ep.task || "—";
+      document.getElementById("step-pill").textContent = `step ${ep.step}/${ep.max_steps}`;
+      document.getElementById("goal").textContent = ep.goal || "—";
+      document.getElementById("feedback").textContent = ep.feedback || "—";
+
+      document.getElementById("hp").textContent = `${Math.round(ag.health)} / 100`;
+      document.getElementById("pos").textContent = `(${ag.x}, ${ag.y})`;
+      document.getElementById("inv").textContent = (ag.inventory && ag.inventory.length) ? ag.inventory.join(", ") : "—";
+      const status = ag.evacuated ? "ESCAPED" : (!ag.alive ? "DOWN" : "active");
+      document.getElementById("status").textContent = status;
+      document.getElementById("hp-fill").style.width = `${Math.max(0, ag.health)}%`;
+
+      document.getElementById("live-pill").style.display = ag.alive && !ag.evacuated ? "" : "none";
+    }
+
+    async function tick() {
+      try {
+        const r = await fetch("/scene");
+        if (r.ok) {
+          const scene = await r.json();
+          draw(scene);
+          updatePanels(scene);
+        }
+      } catch (e) { /* server not ready / no episode */ }
+    }
+
+    setInterval(tick, 250);
+    tick();
+  </script>
+</body>
+</html>

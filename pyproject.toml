@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ember-world"
+version = "0.1.0"
+description = "Ember — a 2D virtual world harness for LLM agents"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "openenv-core[core]>=0.2.2",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+# LLM provider (Google Gemini).
+gemini = [
+    "google-genai>=1.0.0",
+    "requests>=2.31.0",
+]
+
+# Optional: run the live dashboard / HTTP wrapper used for video recording.
+server = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.24.0",
+    "sse-starlette>=2.0.0",
+    "requests>=2.31.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["ember*"]
+exclude = ["examples*", "tests*"]
