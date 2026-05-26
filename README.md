@@ -8,10 +8,6 @@ trapped NPC and escape together*. The fire simulates around it.
 
 ### Demo
 
-A live `key_and_door` episode driven through the dashboard at
-[`http://localhost:8000`](http://localhost:8000) — the agent picks up a
-key, unlocks `door_3`, and steps through an exit:
-
 <video src="assets/demo.mp4" controls width="720" muted playsinline>
   Your browser does not render embedded video. Download or open
   <a href="assets/demo.mp4">assets/demo.mp4</a> directly.
